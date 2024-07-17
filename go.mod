@@ -316,4 +316,4 @@ require (
 	sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd // indirect
 )
 
-replace github.com/external-secrets/external-secrets => github.com/maxnasonov/external-secrets v0.0.0-20240717152157-ee362a9febe1
+replace github.com/external-secrets/external-secrets => github.com/maxnasonov/external-secrets v0.0.0-20240717153754-b0c7ef908a96
