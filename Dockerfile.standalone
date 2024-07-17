@@ -8,6 +8,7 @@ WORKDIR /app
 # Avoid invalidating the `go mod download` cache when only code has changed.
 COPY go.mod go.sum /app/
 RUN go mod download
+RUN go mod tidy
 COPY . /app/
 RUN go build -o external-secrets main.go
 

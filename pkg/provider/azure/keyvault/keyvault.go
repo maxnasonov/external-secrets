@@ -28,6 +28,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	metadata2 "google.golang.org/grpc/metadata"
+	"log"
 	"os"
 	"path"
 	"regexp"
@@ -181,6 +182,8 @@ func newClient(ctx context.Context, store esv1beta1.GenericStore, kube client.Cl
 	case esv1beta1.AzureServicePrincipal:
 		authorizer, err = az.authorizerForServicePrincipal(ctx)
 	case esv1beta1.AzureWorkloadIdentity:
+		log.Printf("XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX")
+		log.Printf(os.Getenv("EXTERNAL_SECRETS_AZURE_KV_SPIRE_AUTH_ENABLED"))
 		if os.Getenv("EXTERNAL_SECRETS_AZURE_KV_SPIRE_AUTH_ENABLED") == "true" {
 			tenantID := os.Getenv("EXTERNAL_SECRETS_AZURE_KV_SPIRE_AUTH_TENANT_ID")
 			clientID := os.Getenv("EXTERNAL_SECRETS_AZURE_KV_SPIRE_AUTH_CLIENT_ID")
