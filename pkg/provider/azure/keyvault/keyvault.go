@@ -22,6 +22,12 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
+	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
+	"github.com/jongio/azidext/go/azidext"
+	"github.com/spiffe/go-spiffe/v2/proto/spiffe/workload"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
+	metadata2 "google.golang.org/grpc/metadata"
 	"os"
 	"path"
 	"regexp"
@@ -175,7 +181,17 @@ func newClient(ctx context.Context, store esv1beta1.GenericStore, kube client.Cl
 	case esv1beta1.AzureServicePrincipal:
 		authorizer, err = az.authorizerForServicePrincipal(ctx)
 	case esv1beta1.AzureWorkloadIdentity:
-		authorizer, err = az.authorizerForWorkloadIdentity(ctx, NewTokenProvider)
+		if os.Getenv("EXTERNAL_SECRETS_AZURE_KV_SPIRE_AUTH_ENABLED") == "true" {
+			tenantID := os.Getenv("EXTERNAL_SECRETS_AZURE_KV_SPIRE_AUTH_TENANT_ID")
+			clientID := os.Getenv("EXTERNAL_SECRETS_AZURE_KV_SPIRE_AUTH_CLIENT_ID")
+			cred, err := azidentity.NewClientAssertionCredential(tenantID, clientID, getAssertion, nil)
+			if err != nil {
+				return nil, err
+			}
+			authorizer = azidext.NewTokenCredentialAdapter(cred, []string{"https://vault.azure.com//.default"})
+		} else {
+			authorizer, err = az.authorizerForWorkloadIdentity(ctx, NewTokenProvider)
+		}
 	default:
 		err = fmt.Errorf(errMissingAuthType)
 	}
@@ -185,6 +201,27 @@ func newClient(ctx context.Context, store esv1beta1.GenericStore, kube client.Cl
 	az.baseClient = &cl
 
 	return az, err
+}
+
+func getAssertion(context.Context) (string, error) {
+	serverAddr := "unix:///run/spire/sockets/spire-agent.sock"
+	opts := []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())}
+	conn, err := grpc.NewClient(serverAddr, opts...)
+	if err != nil {
+		return "", err
+	}
+	defer conn.Close()
+
+	ctx := context.Background()
+	client := workload.NewSpiffeWorkloadAPIClient(conn)
+	metadata := metadata2.New(map[string]string{
+		"workload.spiffe.io": "true",
+	})
+	resp, err := client.FetchJWTSVID(ctx, &workload.JWTSVIDRequest{Audience: []string{"api://AzureADTokenExchange"}}, grpc.Header(&metadata))
+	if err != nil {
+		return "", err
+	}
+	return resp.Svids[0].String(), nil
 }
 
 func getProvider(store esv1beta1.GenericStore) (*esv1beta1.AzureKVProvider, error) {
